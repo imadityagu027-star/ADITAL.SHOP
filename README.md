@@ -1,0 +1,1 @@
+# ADITAL.SHOP
