@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ADITAL</title>
+<style>
+:root{--t:#0F3D38;--g:#E8A33D;--iv:#FAF7EE;--ln:#DCD4C0;--ink:#1A2420;--soft:#4A5750}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:var(--iv);color:var(--ink);line-height:1.5}
+header{position:sticky;top:0;z-index:5;background:var(--iv);border-bottom:1px solid var(--ln);display:flex;justify-content:space-between;align-items:center;padding:12px 18px}
+header b{font-size:22px;color:var(--t);letter-spacing:.04em}
+button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:10px 16px;background:var(--t);color:#fff;font-weight:600}
+button.gold{background:var(--g);color:var(--t)}button.red{background:#B5442E}
+.wrap{max-width:1000px;margin:0 auto;padding:20px 16px}
+.hero{padding:36px 0 12px}.hero h1{font-size:clamp(28px,6vw,44px);color:var(--t);line-height:1.1}.hero p{color:var(--soft);margin-top:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px;margin-top:20px}
+.card{background:#fff;border:1px solid var(--ln);border-radius:12px;overflow:hidden}
+.card img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+.card div{padding:12px;display:flex;flex-direction:column;gap:8px}
+.price{background:#F3C877;color:var(--t);font-weight:700;padding:3px 9px;border-radius:6px;align-self:flex-start}
+section.box{background:#fff;border:1px solid var(--ln);border-radius:12px;padding:20px;margin-top:24px}
+input,textarea{width:100%;padding:11px;border:1px solid var(--ln);border-radius:8px;font:inherit;margin:6px 0 12px;background:#fff}
+.row{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--ln);align-items:center}
+pre{white-space:pre-wrap;background:var(--iv);border:1px solid var(--ln);border-radius:8px;padding:12px;font-size:13px;margin:12px 0}
+[hidden]{display:none!important}a.btn{display:inline-block;background:#25D366;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:600}
+</style></head><body>
+<header><b>ADITAL</b><button id="cb">🛒 Cart (<span id="cc">0</span>)</button></header>
+
+<div class="wrap" id="shop">
+  <div class="hero"><h1>Aapki dukaan, ab online.</h1><p>Product chuno, Cash on Delivery se order karo.</p></div>
+  <div class="grid" id="grid"></div><p id="empty" hidden>Abhi koi product nahi hai.</p>
+
+  <section class="box" id="co" hidden>
+    <h2>Tumhara Cart</h2><div id="lines"></div>
+    <form id="f"><label>Naam</label><input name="Naam" required>
+    <label>Phone</label><input name="Phone" type="tel" required>
+    <label>Address</label><textarea name="Address" required></textarea>
+    <button class="gold" style="width:100%">💵 Cash on Delivery — Order Confirm Karo</button></form>
+    <p id="upi" style="margin-top:12px;color:var(--soft)" hidden></p>
+  </section>
+
+  <section class="box" id="ok" hidden style="text-align:center">
+    <h2 style="color:var(--t)">✓ Order Confirm Ho Gaya!</h2>
+    <p>Payment delivery par cash me deni hai.</p><pre id="sum"></pre>
+    <a class="btn" id="wa" target="_blank" rel="noopener">WhatsApp par bhi bhejo</a>
+  </section>
+</div>
+
+<div class="wrap" id="admin" hidden>
+  <h2>Admin</h2>
+  <section class="box" id="lg"><label>Email</label><input id="em" type="email"><label>Password</label><input id="pw" type="password"><button id="li">Login</button></section>
+  <section class="box" id="pn" hidden>
+    <h3>Naya product</h3>
+    <label>Naam</label><input id="pn1"><label>Price (₹)</label><input id="pp" type="number"><label>Photo</label><input id="pf" type="file" accept="image/*">
+    <button class="gold" id="add">Save karo</button> <button class="red" id="lo">Logout</button>
+    <h3 style="margin-top:20px">Tumhare products</h3><div id="al"></div>
+  </section>
+</div>
+
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getFirestore,collection,addDoc,getDocs,deleteDoc,doc,query,orderBy} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getAuth,signInWithEmailAndPassword,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const WA="91XXXXXXXXXX";   // <-- apna WhatsApp number
+const UPI="";              // <-- apna UPI ID (khaali chhodo to nahi dikhega)
+const app=initializeApp({apiKey:"AIzaSyDjdZ4k0y20m29Nimgk0Yv_KknLC2VPIJs",authDomain:"adital-hub.firebaseapp.com",projectId:"adital-hub",appId:"1:259979170170:web:051f29cb80a114e33786c3"});
+const db=getFirestore(app),auth=getAuth(app),$=id=>document.getElementById(id);
+let P=[],C={};
+const el=(t,p={},k=[])=>{const e=Object.assign(document.createElement(t),p);k.forEach(x=>e.append(x));return e};
+
+function route(){const a=location.hash==="#admin";$("admin").hidden=!a;$("shop").hidden=a}
+addEventListener("hashchange",route);route();
+
+async function load(){
+  try{const s=await getDocs(query(collection(db,"products"),orderBy("t","desc")));P=s.docs.map(d=>({id:d.id,...d.data()}))}
+  catch(e){P=[];alert("Products load nahi hue. Firebase Rules check karo.")}
+  draw()}
+function draw(){
+  $("empty").hidden=P.length>0;$("grid").replaceChildren(...P.map(p=>el("div",{className:"card"},[
+    el("img",{src:p.img,alt:p.name}),
+    el("div",{},[el("b",{textContent:p.name}),el("span",{className:"price",textContent:"₹"+p.price}),
+      el("button",{textContent:"Add Karo",onclick:()=>{C[p.id]=(C[p.id]||0)+1;cart()}})])])));
+  $("al").replaceChildren(...P.map(p=>el("div",{className:"row"},[el("span",{textContent:p.name+" — ₹"+p.price}),
+    el("button",{className:"red",textContent:"Delete",onclick:async()=>{if(confirm("Delete karein?")){await deleteDoc(doc(db,"products",p.id));load()}}})])))}
+
+function lines(){const L=Object.keys(C).filter(i=>C[i]>0).map(i=>{const p=P.find(x=>x.id===i);return p&&{p,q:C[i]}}).filter(Boolean);
+  return{L,tot:L.reduce((s,x)=>s+x.p.price*x.q,0)}}
+function cart(){const {L,tot}=lines();$("cc").textContent=L.reduce((s,x)=>s+x.q,0);
+  $("co").hidden=!L.length;$("lines").replaceChildren(...L.map(x=>el("div",{className:"row"},[
+    el("span",{textContent:x.p.name+" × "+x.q}),el("span",{textContent:"₹"+x.p.price*x.q})])),el("div",{className:"row"},[el("b",{textContent:"Total"}),el("b",{textContent:"₹"+tot})]));
+  if(UPI){$("upi").hidden=false;$("upi").textContent="UPI se bhi de sakte ho: "+UPI}}
+$("cb").onclick=()=>{location.hash="";$("co").hidden?alert("Cart khaali hai"):$("co").scrollIntoView({behavior:"smooth"})};
+
+$("f").onsubmit=async e=>{e.preventDefault();const {L,tot}=lines();if(!L.length)return;
+  const txt=L.map(x=>x.p.name+" x"+x.q+" = ₹"+x.p.price*x.q).join("\n")+"\nTotal: ₹"+tot;
+  const d=new FormData(e.target);d.append("Order",txt);const b=e.target.querySelector("button");b.disabled=true;
+  try{const r=await fetch("https://formspree.io/f/xppaqrob",{method:"POST",body:d,headers:{Accept:"application/json"}});
+    if(!r.ok)throw 0;
+    $("sum").textContent=txt;$("wa").href="https://wa.me/"+WA+"?text="+encodeURIComponent("Naya order\nNaam: "+d.get("Naam")+"\nPhone: "+d.get("Phone")+"\nAddress: "+d.get("Address")+"\n\n"+txt);
+    $("ok").hidden=false;C={};cart();e.target.reset()}
+  catch{alert("Order nahi gaya. Internet check karke dobara try karo.")}b.disabled=false};
+
+onAuthStateChanged(auth,u=>{$("lg").hidden=!!u;$("pn").hidden=!u});
+$("li").onclick=()=>signInWithEmailAndPassword(auth,$("em").value,$("pw").value).catch(()=>alert("Email ya password galat hai"));
+$("lo").onclick=()=>signOut(auth);
+
+const shrink=f=>new Promise(r=>{const i=new Image();i.onload=()=>{const s=Math.min(1,600/Math.max(i.width,i.height)),c=el("canvas");c.width=i.width*s;c.height=i.height*s;c.getContext("2d").drawImage(i,0,0,c.width,c.height);r(c.toDataURL("image/jpeg",.6))};i.src=URL.createObjectURL(f)});
+$("add").onclick=async()=>{const n=$("pn1").value.trim(),pr=Number($("pp").value),f=$("pf").files[0];
+  if(!n||!pr||!f)return alert("Naam, price aur photo teeno chahiye");
+  try{await addDoc(collection(db,"products"),{name:n,price:pr,img:await shrink(f),t:Date.now()});
+    $("pn1").value=$("pp").value=$("pf").value="";load();alert("Product live ho gaya!")}
+  catch{alert("Save nahi hua. Login aur Rules check karo.")}};
+load();
+</script></body></html>
